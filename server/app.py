@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from flask import Flask, make_response, jsonify, session
+from flask import Flask, make_response, jsonify, session, request
 from flask_migrate import Migrate
 
 from models import db, Article, User, ArticleSchema, UserSchema
@@ -12,22 +12,42 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.json.compact = False
 
 migrate = Migrate(app, db)
-
 db.init_app(app)
+
 
 @app.route('/clear')
 def clear_session():
     session['page_views'] = 0
-    return {'message': '200: Successfully cleared session data.'}, 200
+    return jsonify({'message': '200: Successfully cleared session data.'}), 200
+
 
 @app.route('/articles')
 def index_articles():
     articles = [ArticleSchema().dump(a) for a in Article.query.all()]
-    return make_response(articles)
+    return jsonify(articles), 200
 
-@app.route('/articles/<int:id>')
+
+@app.route('/articles/<int:id>', methods=['GET'])
 def show_article(id):
-    pass
+
+    if 'page_views' not in session:
+        session['page_views'] = 0
+
+
+    session['page_views'] += 1
+
+    if session['page_views'] > 3:
+        return jsonify({
+            "message": "Maximum pageview limit reached"
+        }), 401
+
+    article = Article.query.get(id)
+
+    if not article:
+        return jsonify({"error": "Article not found"}), 404
+
+    article_data = ArticleSchema().dump(article)
+    return jsonify(article_data), 200
 
 
 if __name__ == '__main__':
